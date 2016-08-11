@@ -1,0 +1,82 @@
+#!/bin/bash -e
+# set -x
+export JAVA_HOME="/usr/lib/jvm/j2sdk1.8-oracle"
+export JAR_NAME="gatewayService"
+
+function die() {
+	echo "Error: $1" >&2
+	exit 1
+}
+
+[ -z "$LOCAL_DIR" ] && die "No base dir specified"
+[ -z "$TARGET" ] && die "No package target specified"
+[ -z "$INSTALL_BASE" ] && die "No install base specified"
+[ -z "$PACKAGE" ] && die "No package name specified"
+[ ! -d "$LOCAL_DIR" ] && die "$LOCAL_DIR does not exist"
+
+ENV="$TARGET"
+[ -z "$ENV" ] && die "Invalid target: $TARGET"
+
+cd "$LOCAL_DIR"
+MODULENAME=${PACKAGE/fk-/}
+echo $PACKAGE
+echo $MODULENAME
+
+##### DIRS #####
+cp -r build/deb .
+
+ETC="deb/etc/$PACKAGE"
+mkdir -p $ETC/config
+
+mkdir -p deb/etc/init.d
+mkdir -p deb/etc/cron.d
+mkdir -p deb/etc/default
+mkdir -p deb/var/run/$PACKAGE
+mkdir -p deb/var/lib/$PACKAGE
+mkdir -p deb/var/cache/$PACKAGE
+mkdir -p deb/var/log/flipkart/ingestor/$MODULENAME
+mkdir -p deb/usr/share/$PACKAGE/bin
+mkdir -p deb/var/lib/$PACKAGE/dropwizard/
+mkdir -p deb/usr/lib/nagios/plugins/check_$PACKAGE/
+mkdir -p deb/var/lib/$PACKAGE/tmp/
+
+##### Maven Build #####
+MVN_OPTIONS="--errors -DskipTests"
+export MAVEN_OPTS="-Xmx512m -XX:MaxPermSize=192m"
+
+cp src/main/resources/$MODULENAME-config-$ENV.yml $ETC/config/$MODULENAME-config.yml
+
+/usr/share/fk-ops-maven2/bin/mvn -U $MVN_OPTIONS -Denv="$ENV" install
+#mvn -U $MVN_OPTIONS -Denv="$ENV" install
+
+cp target/$JAR_NAME-1.0-SNAPSHOT.jar deb/var/lib/$PACKAGE/$MODULENAME.jar
+
+echo "Present Working Directory :"
+pwd
+
+##### Retrieve package specific variables #####
+. build/$PACKAGE.defaults
+
+##### Substitutions and moves #####
+cp build/init-script deb/etc/init.d/$PACKAGE
+cp build/$PACKAGE-healthcheck-cron deb/etc/cron.d/$PACKAGE-healthcheck-cron
+sed -i -e "s/_UID_/$PAC_UID/g; s/_PACKAGE_/$PACKAGE/g; s/_ENV_/$ENV/g; s/_MODULENAME_/$MODULENAME/g" deb/DEBIAN/* deb/etc/init.d/$PACKAGE
+sed -i -e "s/_SERVICE_PORT_/$SERVICE_PORT/g; s/_HEALTH_PORT_/$HEALTH_PORT/g; s/_JMX_PORT_/$JMX_PORT/g; s/_DEBUG_PORT_/$DEBUG_PORT/g;" deb/etc/init.d/$PACKAGE
+
+#####run.sh for health######
+cp build/run.sh deb/usr/share/$PACKAGE/bin/run.sh
+sed -i -e "s/_SERVICE_PORT_/$SERVICE_PORT/g; s/_HEALTH_PORT_/$HEALTH_PORT/g; " deb/usr/share/$PACKAGE/bin/run.sh
+
+##### Generate /etc/default/packagename ######
+### see build/etc/packagename.defaults for more JAVA_OPTS ###
+
+# Create /etc/default/_PACKAGE_
+echo "# $PACKAGE
+USER=$PACKAGE
+JAVA_OPTS=\"$JAVA_OPTS\"
+GROUP=fk-cms
+CMS_UID=$PAC_UID
+CMS_GID=5000
+ADMIN_PORT=$ADMIN_PORT
+ENV=$ENV
+" > deb/etc/default/$PACKAGE

@@ -1,0 +1,3 @@
+MAILTO=spcatalog-oncall@flipkart.com
+
+*/5 * * * * root /usr/lib/nagios/plugins/fk-ops-nsca-wrapper/nsca_wrapper -H `hostname` -N 10.5.1.11:10.5.1.12 -S 'fk-ingestor-gateway-healthcheck' -b /usr/sbin/send_nsca -c /etc/send_nsca.cfg -C "/usr/lib/nagios/plugins/check_http -H localhost -p 8081 -u /ping -R class=\"false\" --invert-regex  -c10 -t20" >> /var/log/nsca.log 2>&1

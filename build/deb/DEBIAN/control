@@ -1,0 +1,9 @@
+Package: _PACKAGE_
+Version: 1._VERSION_
+Architecture: all
+Section: flipkart/ingestor
+Priority: standard
+Maintainer: Ingestor Team <ixp-dev@flipkart.com>
+Depends: oracle-java8-installer, fk-sp-empujador-deploy
+Recommends: fk-ops-vip-health-check-module
+Description: Ingestor's Gateway as a service

@@ -1,0 +1,61 @@
+#!/bin/bash -x
+set -x
+
+function die()
+{
+        echo "Error: $1" >&2
+        exit 1
+}
+
+PACK_VERSION=$SVN_REVISION
+DEB_FILE=`ls ${WORKSPACE}/${PACKAGE}*${PACK_VERSION}*${TARGET}*.deb`
+#MD5_FILE=$DEB_FILE.md5
+[ ! -f "$DEB_FILE" ] && die "Version:${PACK_VERSION} No package $DEB_FILE found"
+
+#md5sum $DEB_FILE |cut -d" " -f1 > $MD5_FILE
+DEB_FILE_NAME=`basename "$DEB_FILE"`
+VERSION_STRING=${DEB_FILE_NAME#${PACKAGE}_}
+VERSION_STRING=${VERSION_STRING%_all.deb}
+
+if [ -z "${TARGET}" ]; then
+	die "No target specified."
+fi
+
+APT_SERVER="stage-build1.ch.flipkart.com"
+case "$TARGET" in 
+	NM|nm)
+                SSH_KEY=/var/lib/jenkins/.ssh/fk-build-user.key.prod-nm.squeeze
+		APT_SERVER="prod-build1.nm.flipkart.com";;
+	QA|qa)
+                SSH_KEY=/var/lib/jenkins/.ssh/fk-build-user.key.stage-ch.squeeze
+		APT_SERVER="stage-build1.ch.flipkart.com";;
+	stagech|STAGECH)
+                SSH_KEY=/var/lib/jenkins/.ssh/fk-build-user.key.stage-ch.squeeze
+		APT_SERVER="stage-build1.ch.flipkart.com";;
+	e2e|E2E)
+               SSH_KEY=/var/lib/jenkins/.ssh/fk-build-user.stage-nm.squeeze
+               APT_SERVER="stage-apt.nm.flipkart.com";;
+	perf|PERF)
+	       SSH_KEY=/var/lib/jenkins/.ssh/fk-build-user..key.stage-nm.squeeze
+               APT_SERVER="stage-apt.nm.flipkart.com";;	
+esac
+
+SSH_OPTS="-i $SSH_KEY -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes"
+SSH_USER=fk-build-user
+
+echo "APT_SERVER = " + $APT_SERVER
+if [ -z "${APT_SERVER}" ]; then
+	die "No APT_SERVER can be found for the target ${TARGET}"
+fi
+
+echo "Pushing to apt server for ${TARGET}"
+
+#scp $SSH_OPTS "$DEB_FILE" "$SSH_USER"@"${APT_SERVER}":/var/data/ftp-all/apt/ && ssh $SSH_OPTS -t -t "$SSH_USER"@"${APT_SERVER}" "sudo -u fk-ops-build  /usr/sbin/fk-update-apt /var/data/ftp-all/apt/$DEB_FILE_NAME" && ssh $SSH_OPTS "$SSH_USER"@"${APT_SERVER}" "/bin/rm -f /var/data/ftp-all/apt/$DEB_FILE_NAME"
+#scp $SSH_OPTS "$MD5_FILE" "$SSH_USER"@"${APT_SERVER}":/var/data/ftp-all/apt/ && ssh $SSH_OPTS -t -t "$SSH_USER"@"${APT_SERVER}"
+
+scp $SSH_OPTS "$DEB_FILE" "$SSH_USER"@"${APT_SERVER}":/var/data/ftp-all/apt/ && ssh $SSH_OPTS -t -t "$SSH_USER"@"${APT_SERVER}" "sudo -u fk-ops-build flock /var/lock/fk-update-apt.lock -c  \"/usr/sbin/fk-update-apt /var/data/ftp-all/apt/$DEB_FILE_NAME\"" && ssh $SSH_OPTS "$SSH_USER"@"${APT_SERVER}" "/bin/rm -f /var/data/ftp-all/apt/$DEB_FILE_NAME"
+
+#scp $SSH_OPTS "$DEB_FILE" "$SSH_USER"@"${APT_SERVER}":~/upload/ 
+
+
+

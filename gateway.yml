@@ -1,0 +1,33 @@
+appName: "Ingestor Gateway"
+
+gatewayConfiguration:
+  rawStoreConfiguration:
+    activeD42StoreConfig:
+      accessKey: "YYQDN1DIFF1JVDGZKMOX"
+      secretKey: "DMA8+v0g3jJWofvA6U9C8Fg9rYnQgbnwoCbJlr1I"
+      endPoint: "10.47.2.3"
+    backUpD42StoreConfig:
+      accessKey: "YYQDN1DIFF1JVDGZKMOX"
+      secretKey: "DMA8+v0g3jJWofvA6U9C8Fg9rYnQgbnwoCbJlr1I"
+      endPoint: "10.47.2.3"
+    mysqlConfiguration:
+      hostname: "localhost"
+      username: "root"
+      password: ""
+      dbName: "rawStore"
+  metaStoreConfiguration:
+    tenantId: "aventador"
+    esConfiguration:
+      clusterName: "elasticsearch"
+      clusterHostNames:
+        - "catalog-backend4.nm.flipkart.com"
+      clusterHostPort: "9300"
+  kafkaConfiguration:
+    hosts:
+      - name : 'catalog-backend4.nm.flipkart.com'
+        port : 9092
+    acknowledge: "all"
+    retries: 3
+    batchSize: 10
+    lingerInMs: 0
+    bufferMemory: 52428800

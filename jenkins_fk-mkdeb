@@ -1,0 +1,42 @@
+#!/bin/bash -e
+
+function die()
+{
+        echo "Error: $1" >&2
+        exit 1;
+}
+
+function cleanup()
+{
+        [ -d "$TMPDIR" ] && rm -rf "$TMPDIR"
+        exit $1
+}
+
+# Sanity checks
+DEBDIR="${WORKSPACE}/deb"
+DEBDIR=`echo "$DEBDIR" | sed -e 's/[\/]*$//g'`
+[ -z "$DEBDIR" ] && die "No package directory specified"
+[ ! -f "$DEBDIR/DEBIAN/control" ] && die "Invalid package directory $DEBDIR specified"
+
+TARGET_DIR="${WORKSPACE}"
+[ ! -d "$TARGET_DIR" ] && mkdir $TARGET_DIR
+TARGET_DIR=`echo "$TARGET_DIR" | sed -e 's/[\/]*$//g'`
+
+SERVERS="${WORKSPACE}/server_${PACKAGE}.txt"
+sed -i -e "s/_PACKAGE_/$PACKAGE/g" -e "s/_VERSION_/${SVN_REVISION}-01${TARGET}/g" $DEBDIR/DEBIAN/control
+
+# Create temp dir
+TMPDIR=`mktemp -d /tmp/fk-mkdeb.XXXX`
+
+# Copy over all folders from DEBDIR to this dir
+for f in "$DEBDIR"/*; do
+        #[ -d "$f" ] && (cp -a "$f" "$TMPDIR" || cleanup 1)
+        [ -d "$f" ] && (rsync -a --exclude ".svn" --exclude ".git" "$f" "$TMPDIR" || cleanup 1)
+done
+
+
+# Package the final product
+dpkg-deb -b "$TMPDIR" "$TARGET_DIR" || cleanup 1
+
+# cleanup
+cleanup 0
